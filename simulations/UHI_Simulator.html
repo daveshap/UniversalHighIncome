@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal High Income Simulator — Shapiro (2026)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0a0f1a;font-family:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;color:#e2e8f0}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:#0a0f1a}
+::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#e2e8f0;cursor:pointer;box-shadow:0 0 4px rgba(91,141,239,.5)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#e2e8f0;cursor:pointer;border:none;box-shadow:0 0 4px rgba(91,141,239,.5)}
+
+.app{display:flex;flex-direction:column;height:100vh}
+.header{padding:14px 24px;border-bottom:1px solid #1e293b;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0f172a,#0a0f1a);flex-shrink:0}
+.header h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.5px;background:linear-gradient(135deg,#5B8DEF,#2DD4A8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header p{margin:2px 0 0;font-size:11px;color:#64748b}
+.presets{display:flex;gap:6px}
+.presets button{padding:5px 10px;font-size:10px;font-weight:600;border-radius:4px;border:1px solid #334155;background:#1e293b;color:#94a3b8;cursor:pointer;letter-spacing:.3px;transition:all .15s}
+.presets button:hover{background:#334155;color:#e2e8f0}
+
+.body{display:flex;flex:1;overflow:hidden}
+.panel{width:300px;overflow-y:auto;background:#0f172a;border-right:1px solid #1e293b;flex-shrink:0;padding:16px;transition:width .3s,padding .3s}
+.panel.closed{width:0;padding:0;overflow:hidden}
+.panel-toggle{display:flex;align-items:center;flex-shrink:0}
+.panel-toggle button{width:20px;height:44px;border-radius:0 6px 6px 0;background:#1e293b;border:1px solid #334155;border-left:none;color:#64748b;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center}
+
+.section-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 0;border-bottom:1px solid #1e293b;margin-bottom:8px}
+.section-head span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#64748b}
+.section-head .arrow{font-size:10px;color:#475569}
+.section{margin-bottom:12px}
+
+.slider-row{margin-bottom:10px}
+.slider-row.disabled{opacity:.35;pointer-events:none}
+.slider-label{display:flex;justify-content:space-between;margin-bottom:3px}
+.slider-label span:first-child{font-size:11px;color:#94a3b8;letter-spacing:.3px}
+.slider-label span:last-child{font-size:11px;color:#e2e8f0;font-family:monospace;font-weight:600}
+
+.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 0;font-size:12px;user-select:none;transition:color .2s}
+.toggle .track{width:34px;height:18px;border-radius:9px;position:relative;transition:background .2s;flex-shrink:0}
+.toggle .thumb{width:14px;height:14px;border-radius:7px;background:#fff;position:absolute;top:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.toggle.on{color:#e2e8f0}
+.toggle.off{color:#64748b}
+
+.main{flex:1;display:flex;flex-direction:column;padding:16px 24px 12px 32px;min-width:0}
+.cards{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;flex-shrink:0}
+.card{background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 16px;flex:1 1 140px;min-width:120px}
+.card .lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#475569;margin-bottom:2px}
+.card .val{font-size:20px;font-weight:800;font-family:monospace;letter-spacing:-.5px}
+.card .sub{font-size:10px;color:#64748b;margin-top:1px}
+
+.chart-wrap{flex:1;min-height:0;position:relative}
+.chart-wrap canvas{width:100%!important;height:100%!important}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:10px 0 4px;justify-content:center;flex-shrink:0}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:#94a3b8}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+
+.footer{font-size:9px;color:#334155;text-align:center;padding:4px 0;flex-shrink:0}
+.note{font-size:9px;color:#475569;margin:4px 0 0;line-height:1.4}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>Universal High Income Simulator</h1>
+      <p>Post-Labor Economy · Median Household Income · Constant 2024 Dollars</p>
+    </div>
+    <div class="presets">
+      <button onclick="applyPreset('proactive')">Proactive</button>
+      <button onclick="applyPreset('reactive')">Reactive</button>
+      <button onclick="applyPreset('delayed')">Delayed</button>
+      <button onclick="applyPreset('noAction')">No Action</button>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- Side panel -->
+    <div class="panel" id="panel"></div>
+
+    <!-- Panel toggle -->
+    <div class="panel-toggle">
+      <button onclick="togglePanel()" id="panelBtn">◂</button>
+    </div>
+
+    <!-- Main chart area -->
+    <div class="main">
+      <div class="cards" id="cards"></div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      <div class="legend" id="legend"></div>
+      <div class="footer">Shapiro (2026) UHI Framework · Toy model for scenario exploration, not point forecast · All values in constant 2024 USD</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════
+const NUM_HH = 131000000;
+const BASE_GDP = 29000000000000;
+const BASE_YEAR = 2025;
+const BASE_MEDIAN = 83730;
+
+const STREAMS = [
+  {key:"wages",label:"Residual Wages",color:"#5B8DEF"},
+  {key:"social",label:"Social Insurance",color:"#A78BFA"},
+  {key:"ubi",label:"Universal Basic Income",color:"#2DD4A8"},
+  {key:"swf",label:"SWF Dividend",color:"#F5A623"},
+  {key:"esop",label:"ESOP / Co-op Share",color:"#FF6B6B"},
+  {key:"babyBonds",label:"Baby Bond Returns",color:"#C084FC"},
+  {key:"dataRoyalty",label:"Data / AI Royalty",color:"#38BDF8"},
+  {key:"privateInv",label:"Private Investment",color:"#FB923C"},
+  {key:"carbon",label:"Carbon Dividend",color:"#34D399"},
+  {key:"deMonet",label:"Demonetization Gain",color:"#F472B6"},
+];
+
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+const DEFAULTS = {
+  endYear:2060,automationPace:2.5,baseGdpGrowth:2.0,
+  swfSeed:100,swfContribRate:1.5,swfReturnRate:7.0,swfSpendRule:3.0,
+  ubiMonthly:2000,ubiRampYears:12,
+  babyBondSeed:5000,babyBondReturn:7.0,babyBondMaturity:18,
+  esopGrowth:7.0,dataRoyaltyMax:12000,
+  carbonBase:900,carbonGrowth:4.0,
+  privateInvBase:4185,privateInvGrowth:3.5,
+  demonetRate:35,
+  enableSWF:true,enableUBI:true,enableBabyBonds:true,enableVAT:true,
+  enableCarbon:true,enableAutoLevy:true,enableWealthTax:true,
+  enableDataRoyalty:true,enableESOP:true,enableDemonet:true,
+};
+
+let P = Object.assign({}, DEFAULTS);
+let panelOpen = true;
+let chart = null;
+
+// ══════════════════════════════════════════════════════════
+// SIMULATION ENGINE
+// ══════════════════════════════════════════════════════════
+function simulate(p) {
+  const data = [];
+  let gdp = BASE_GDP;
+  let swfBalance = p.enableSWF ? p.swfSeed * 1e9 : 0;
+  let automationLevel = 0.05;
+
+  for (let year = BASE_YEAR; year <= p.endYear; year++) {
+    const t = year - BASE_YEAR;
+    const rawPace = p.automationPace / 100;
+    automationLevel = Math.min(0.95, automationLevel + rawPace * (1 + automationLevel) * (1 - automationLevel));
+
+    gdp = gdp * (1 + p.baseGdpGrowth / 100 + automationLevel * 0.025);
+
+    let rev = 0.6;
+    if (p.enableVAT) rev += 0.15;
+    if (p.enableAutoLevy) rev += 0.10;
+    if (p.enableWealthTax) rev += 0.08;
+    rev = Math.min(1.0, rev);
+
+    const afb = Math.max(0, automationLevel - 0.05) / 0.95;
+    const wages = Math.max(3000, 68660 * Math.max(0.04, 1 - afb * 0.96) * (1 + afb * 0.3));
+    const social = 10885 * Math.pow(gdp / BASE_GDP, 0.25) * (1 + t * 0.005);
+
+    let swf = 0;
+    if (p.enableSWF) {
+      const c = (p.swfContribRate / 100) * gdp * rev;
+      const r = swfBalance * (p.swfReturnRate / 100);
+      const d = swfBalance * (p.swfSpendRule / 100);
+      swfBalance = swfBalance + c + r - d;
+      swf = d / NUM_HH;
+    }
+
+    let ubi = 0;
+    if (p.enableUBI) ubi = p.ubiMonthly * 12 * 1.5 * Math.min(1, t / Math.max(1, p.ubiRampYears)) * rev;
+
+    let esop = 0;
+    if (p.enableESOP) esop = Math.min(30000, 800 * Math.pow(1 + p.esopGrowth / 100, t) * Math.pow(gdp / BASE_GDP, 0.3) * Math.min(1, t / 5));
+
+    let bb = 0;
+    if (p.enableBabyBonds && t >= p.babyBondMaturity) {
+      const mv = p.babyBondSeed * Math.pow(1 + p.babyBondReturn / 100, p.babyBondMaturity);
+      bb = mv * (p.babyBondReturn / 100) * Math.min(1, (t - p.babyBondMaturity) / 25);
+    }
+
+    let dr = 0;
+    if (p.enableDataRoyalty) dr = p.dataRoyaltyMax * automationLevel * Math.pow(gdp / BASE_GDP, 0.4) * rev * Math.min(1, t / 8);
+
+    let carb = 0;
+    if (p.enableCarbon) carb = p.carbonBase * Math.pow(1 + p.carbonGrowth / 100, t) * Math.min(1, t / 3);
+
+    const pi = p.privateInvBase * Math.pow(1 + p.privateInvGrowth / 100, t) * Math.pow(gdp / BASE_GDP, 0.2);
+    const nom = wages + social + ubi + swf + esop + bb + dr + carb + pi;
+
+    let dm = 0;
+    if (p.enableDemonet) {
+      const cr = (p.demonetRate / 100) * afb;
+      if (cr > 0 && cr < 1) dm = nom * (1 / (1 - cr) - 1);
+    }
+
+    data.push({
+      year, wages:Math.round(wages), social:Math.round(social), ubi:Math.round(ubi),
+      swf:Math.round(swf), esop:Math.round(esop), babyBonds:Math.round(bb),
+      dataRoyalty:Math.round(dr), privateInv:Math.round(pi), carbon:Math.round(carb),
+      deMonet:Math.round(dm), total:Math.round(nom + dm),
+      automationLevel:Math.round(automationLevel * 100),
+      gdpT:+(gdp / 1e12).toFixed(1), swfT:+(swfBalance / 1e12).toFixed(1),
+    });
+  }
+  return data;
+}
+
+// ══════════════════════════════════════════════════════════
+// UI BUILDERS
+// ══════════════════════════════════════════════════════════
+function fmtK(v) { return v >= 1000 ? '$' + Math.round(v/1000) + 'k' : '$' + v; }
+function fmtFull(v) { return '$' + v.toLocaleString(); }
+
+function makeSlider(container, label, key, min, max, step, unit, disableKey) {
+  const row = document.createElement('div');
+  row.className = 'slider-row' + (disableKey && !P[disableKey] ? ' disabled' : '');
+  row.dataset.disableKey = disableKey || '';
+  row.dataset.key = key;
+
+  const lbl = document.createElement('div');
+  lbl.className = 'slider-label';
+  const pct = ((P[key] - min) / (max - min)) * 100;
+  lbl.innerHTML = '<span>' + label + '</span><span class="sval">' +
+    (typeof P[key] === 'number' ? P[key].toLocaleString() : P[key]) + (unit || '') + '</span>';
+
+  const inp = document.createElement('input');
+  inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step || 1; inp.value = P[key];
+  inp.style.background = 'linear-gradient(to right, #5B8DEF ' + pct + '%, #334155 ' + pct + '%)';
+
+  inp.addEventListener('input', function() {
+    P[key] = parseFloat(this.value);
+    const p2 = ((P[key] - min) / (max - min)) * 100;
+    this.style.background = 'linear-gradient(to right, #5B8DEF ' + p2 + '%, #334155 ' + p2 + '%)';
+    row.querySelector('.sval').textContent = (typeof P[key] === 'number' ? P[key].toLocaleString() : P[key]) + (unit || '');
+    update();
+  });
+
+  row.appendChild(lbl);
+  row.appendChild(inp);
+  container.appendChild(row);
+}
+
+function makeToggle(container, label, key, color) {
+  const div = document.createElement('div');
+  div.className = 'toggle ' + (P[key] ? 'on' : 'off');
+  div.dataset.key = key;
+
+  const track = document.createElement('div');
+  track.className = 'track';
+  track.style.background = P[key] ? (color || '#5B8DEF') : '#334155';
+  const thumb = document.createElement('div');
+  thumb.className = 'thumb';
+  thumb.style.left = P[key] ? '18px' : '2px';
+  track.appendChild(thumb);
+
+  const txt = document.createTextNode(label);
+  div.appendChild(track);
+  div.appendChild(txt);
+
+  div.addEventListener('click', function() {
+    P[key] = !P[key];
+    track.style.background = P[key] ? (color || '#5B8DEF') : '#334155';
+    thumb.style.left = P[key] ? '18px' : '2px';
+    div.className = 'toggle ' + (P[key] ? 'on' : 'off');
+    // Enable/disable related sliders
+    document.querySelectorAll('.slider-row').forEach(function(r) {
+      if (r.dataset.disableKey === key) {
+        r.className = 'slider-row' + (!P[key] ? ' disabled' : '');
+      }
+    });
+    update();
+  });
+
+  container.appendChild(div);
+}
+
+function makeSection(container, title, builder) {
+  const sec = document.createElement('div');
+  sec.className = 'section';
+  const head = document.createElement('div');
+  head.className = 'section-head';
+  head.innerHTML = '<span>' + title + '</span><span class="arrow">▾</span>';
+  const body = document.createElement('div');
+  body.className = 'section-body';
+
+  head.addEventListener('click', function() {
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    head.querySelector('.arrow').textContent = open ? '▸' : '▾';
+    head.style.marginBottom = open ? '0' : '8px';
+  });
+
+  builder(body);
+  sec.appendChild(head);
+  sec.appendChild(body);
+  container.appendChild(sec);
+}
+
+function makeNote(container, text) {
+  const p = document.createElement('p');
+  p.className = 'note';
+  p.textContent = text;
+  container.appendChild(p);
+}
+
+// ══════════════════════════════════════════════════════════
+// BUILD PANEL
+// ══════════════════════════════════════════════════════════
+function buildPanel() {
+  const el = document.getElementById('panel');
+  el.innerHTML = '';
+
+  makeSection(el, 'Simulation Range', function(b) {
+    makeSlider(b, 'End Year', 'endYear', 2035, 2100, 5);
+  });
+
+  makeSection(el, 'Automation & Growth', function(b) {
+    makeSlider(b, 'Automation Pace', 'automationPace', 0.5, 6, 0.1, '%/yr');
+    makeSlider(b, 'Base GDP Growth', 'baseGdpGrowth', 0.5, 5, 0.1, '%');
+  });
+
+  makeSection(el, 'Sovereign Wealth Fund', function(b) {
+    makeToggle(b, 'Enable SWF', 'enableSWF', '#F5A623');
+    makeSlider(b, 'Initial Seed', 'swfSeed', 0, 500, 10, 'B', 'enableSWF');
+    makeSlider(b, 'Annual Contribution', 'swfContribRate', 0.1, 5, 0.1, '% GDP', 'enableSWF');
+    makeSlider(b, 'Return Rate', 'swfReturnRate', 2, 12, 0.5, '%', 'enableSWF');
+    makeSlider(b, 'Spending Rule', 'swfSpendRule', 1, 6, 0.25, '%', 'enableSWF');
+  });
+
+  makeSection(el, 'Universal Basic Income', function(b) {
+    makeToggle(b, 'Enable UBI', 'enableUBI', '#2DD4A8');
+    makeSlider(b, 'Target (per adult/mo)', 'ubiMonthly', 250, 5000, 50, '$', 'enableUBI');
+    makeSlider(b, 'Ramp-Up Period', 'ubiRampYears', 3, 25, 1, ' yrs', 'enableUBI');
+  });
+
+  makeSection(el, 'Baby Bonds', function(b) {
+    makeToggle(b, 'Enable Baby Bonds', 'enableBabyBonds', '#C084FC');
+    makeSlider(b, 'Seed Amount', 'babyBondSeed', 1000, 50000, 500, '$', 'enableBabyBonds');
+    makeSlider(b, 'Return Rate', 'babyBondReturn', 3, 12, 0.5, '%', 'enableBabyBonds');
+    makeSlider(b, 'Maturity Age', 'babyBondMaturity', 12, 25, 1, ' yrs', 'enableBabyBonds');
+  });
+
+  makeSection(el, 'Other Income Streams', function(b) {
+    makeToggle(b, 'Enable ESOP / Co-op', 'enableESOP', '#FF6B6B');
+    makeSlider(b, 'ESOP Coverage Growth', 'esopGrowth', 1, 15, 0.5, '%/yr', 'enableESOP');
+    makeToggle(b, 'Data / AI Royalty', 'enableDataRoyalty', '#38BDF8');
+    makeSlider(b, 'Max Royalty (full auto)', 'dataRoyaltyMax', 1000, 30000, 500, '$/HH', 'enableDataRoyalty');
+    makeToggle(b, 'Carbon / Commons Dividend', 'enableCarbon', '#34D399');
+    makeSlider(b, 'Carbon Base', 'carbonBase', 200, 3000, 50, '$/yr', 'enableCarbon');
+  });
+
+  makeSection(el, 'Revenue Sources', function(b) {
+    makeToggle(b, 'Value-Added Tax (VAT)', 'enableVAT');
+    makeToggle(b, 'Automation Levy', 'enableAutoLevy');
+    makeToggle(b, 'Wealth Tax', 'enableWealthTax');
+    makeNote(b, 'Revenue sources fund UBI, SWF contributions, and data royalties. Disabling reduces transfer capacity.');
+  });
+
+  makeSection(el, 'Demonetization & Deflation', function(b) {
+    makeToggle(b, 'Enable Demonetization', 'enableDemonet', '#F472B6');
+    makeSlider(b, 'Max Cost Reduction', 'demonetRate', 0, 60, 1, '%', 'enableDemonet');
+    makeNote(b, 'AI lowers costs of healthcare, education, legal, digital services. Purchasing power rises even if nominal income stays flat.');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// CHART
+// ══════════════════════════════════════════════════════════
+function hexToRGBA(hex, a) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
+function activeStreams() {
+  return STREAMS.filter(function(s) {
+    if (s.key === 'wages' || s.key === 'social' || s.key === 'privateInv') return true;
+    if (s.key === 'swf') return P.enableSWF;
+    if (s.key === 'ubi') return P.enableUBI;
+    if (s.key === 'esop') return P.enableESOP;
+    if (s.key === 'babyBonds') return P.enableBabyBonds;
+    if (s.key === 'dataRoyalty') return P.enableDataRoyalty;
+    if (s.key === 'carbon') return P.enableCarbon;
+    if (s.key === 'deMonet') return P.enableDemonet;
+    return true;
+  });
+}
+
+function buildChart(data) {
+  const ctx = document.getElementById('chart').getContext('2d');
+  const labels = data.map(function(d) { return d.year; });
+  const streams = activeStreams();
+
+  const datasets = streams.map(function(s) {
+    return {
+      label: s.label,
+      data: data.map(function(d) { return d[s.key]; }),
+      backgroundColor: hexToRGBA(s.color, 0.55),
+      borderColor: s.color,
+      borderWidth: 1,
+      fill: true,
+      pointRadius: 0,
+      pointHitRadius: 8,
+      tension: 0.3,
+    };
+  });
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f172aee',
+          borderColor: '#1e293b',
+          borderWidth: 1,
+          titleFont: { size: 13, weight: 'bold' },
+          bodyFont: { size: 11, family: 'monospace' },
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: {
+            title: function(items) {
+              if (!items.length) return '';
+              const idx = items[0].dataIndex;
+              const row = data[idx];
+              const total = row.total;
+              return row.year + '  —  $' + total.toLocaleString() + '/yr';
+            },
+            afterTitle: function(items) {
+              if (!items.length) return '';
+              const row = data[items[0].dataIndex];
+              return 'Automation: ' + row.automationLevel + '%  ·  GDP: $' + row.gdpT + 'T  ·  SWF: $' + row.swfT + 'T';
+            },
+            label: function(ctx) {
+              if (ctx.raw === 0) return null;
+              return '  ' + ctx.dataset.label + ':  $' + ctx.raw.toLocaleString();
+            },
+            labelColor: function(ctx) {
+              return { borderColor: ctx.dataset.borderColor, backgroundColor: ctx.dataset.borderColor, borderRadius: 2 };
+            },
+          },
+        },
+        annotation: undefined,
+      },
+      scales: {
+        x: {
+          grid: { color: '#1e293b' },
+          ticks: { color: '#64748b', font: { size: 11 } },
+          border: { color: '#334155' },
+        },
+        y: {
+          stacked: true,
+          grid: { color: '#1e293b' },
+          ticks: {
+            color: '#64748b',
+            font: { size: 10 },
+            callback: function(v) { return fmtK(v); }
+          },
+          border: { color: '#334155' },
+        }
+      },
+    },
+    plugins: [{
+      id: 'refLine',
+      afterDraw: function(chart) {
+        const yScale = chart.scales.y;
+        const y = yScale.getPixelForValue(BASE_MEDIAN);
+        if (y < yScale.top || y > yScale.bottom) return;
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(chart.chartArea.left, y);
+        ctx.lineTo(chart.chartArea.right, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px system-ui';
+        ctx.fillText('Today: ' + fmtFull(BASE_MEDIAN), chart.chartArea.left + 6, y - 5);
+        ctx.restore();
+      }
+    }]
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// UPDATE LOOP
+// ══════════════════════════════════════════════════════════
+function updateCards(data) {
+  const first = data[0], last = data[data.length - 1], mid = data[Math.floor(data.length / 2)];
+  const cards = [
+    { l: BASE_YEAR, v: fmtFull(first.total), s: 'Starting Income', a: '#94a3b8' },
+    { l: mid.year, v: fmtFull(mid.total), s: 'Midpoint · ' + mid.automationLevel + '% Automated', a: '#5B8DEF' },
+    { l: last.year, v: fmtFull(last.total), s: 'End State · ' + last.automationLevel + '% Automated', a: '#2DD4A8' },
+    { l: 'SWF Balance', v: '$' + last.swfT + 'T', s: 'GDP: $' + last.gdpT + 'T', a: '#F5A623' },
+    { l: 'vs. Today', v: Math.round((last.total / BASE_MEDIAN) * 100) + '%', s: 'of $' + BASE_MEDIAN.toLocaleString(), a: '#C084FC' },
+  ];
+  const el = document.getElementById('cards');
+  el.innerHTML = '';
+  cards.forEach(function(c) {
+    el.innerHTML += '<div class="card"><div class="lbl">' + c.l + '</div><div class="val" style="color:' + c.a + '">' + c.v + '</div><div class="sub">' + c.s + '</div></div>';
+  });
+}
+
+function updateLegend() {
+  const el = document.getElementById('legend');
+  el.innerHTML = '';
+  activeStreams().forEach(function(s) {
+    el.innerHTML += '<div class="legend-item"><div class="legend-dot" style="background:' + s.color + '"></div>' + s.label + '</div>';
+  });
+}
+
+function update() {
+  const data = simulate(P);
+  updateCards(data);
+  buildChart(data);
+  updateLegend();
+}
+
+// ══════════════════════════════════════════════════════════
+// PRESETS & PANEL TOGGLE
+// ══════════════════════════════════════════════════════════
+function applyPreset(p) {
+  const D = DEFAULTS;
+  if (p === 'proactive') P = Object.assign({}, D);
+  if (p === 'reactive') P = Object.assign({}, D, { swfSeed:0, swfContribRate:0.8, ubiRampYears:18, babyBondSeed:2000 });
+  if (p === 'delayed') P = Object.assign({}, D, { enableSWF:false, enableBabyBonds:false, enableDataRoyalty:false, enableESOP:false, ubiRampYears:22, enableVAT:false, enableWealthTax:false });
+  if (p === 'noAction') P = Object.assign({}, D, { enableSWF:false, enableUBI:false, enableBabyBonds:false, enableVAT:false, enableCarbon:false, enableAutoLevy:false, enableWealthTax:false, enableDataRoyalty:false, enableESOP:false, enableDemonet:false });
+  buildPanel();
+  update();
+}
+
+function togglePanel() {
+  panelOpen = !panelOpen;
+  document.getElementById('panel').className = 'panel' + (panelOpen ? '' : ' closed');
+  document.getElementById('panelBtn').textContent = panelOpen ? '◂' : '▸';
+  // Resize chart after transition
+  setTimeout(function() { if (chart) chart.resize(); }, 350);
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+buildPanel();
+update();
+</script>
+</body>
+</html>
